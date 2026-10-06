@@ -1,0 +1,23 @@
+{
+    "active_version": "v009",
+    "models": {
+        "baseline": {
+            "path": "models_v\\learn_hf_food_not_food_text_classifier_distilbert"
+        },
+        "v002": {
+            "path": "models_v/v002"
+        },
+        "v006": {
+            "path": "models_v/v006"
+        },
+        "v007": {
+            "path": "models_v/v007"
+        },
+        "v008": {
+            "path": "models_v/v008"
+        },
+        "v009": {
+            "path": "models_v/v009"
+        }
+    }
+}

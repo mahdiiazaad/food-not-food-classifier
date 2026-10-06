@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter generated files
+.ipynb_checkpoints/
+.virtual_documents/
+.pytest_cache/
+
+# Runtime files
+data/retraining.log
+data/retraining.lock
+
+# Generated model versions
+models_v/v*/
+
+# Local model artifacts
+models/
+
+# Training checkpoints
+models_v/learn_hf_food_not_food_text_classifier_distilbert/checkpoint-*/
+
+models_v/*/model.safetensors
+models_v/*/training_args.bin

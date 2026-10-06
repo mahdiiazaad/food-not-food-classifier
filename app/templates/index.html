@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Food Not-Food Classifier</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --app-bg: #f6f7f4;
+      --app-ink: #1d2320;
+      --app-muted: #5f6b65;
+      --app-accent: #1f6f50;
+      --app-border: #dfe3dd;
+    }
+    body { background: var(--app-bg); color: var(--app-ink); }
+    .app-shell { max-width: 820px; }
+    .app-title { font-weight: 700; letter-spacing: -0.02em; }
+    .app-muted { color: var(--app-muted); }
+    .card { border: 1px solid var(--app-border); border-radius: 0.75rem; }
+    .btn-accent { background: var(--app-accent); border-color: var(--app-accent); color: #fff; }
+    .btn-accent:hover, .btn-accent:focus { background: #185a41; border-color: #185a41; color: #fff; }
+    .btn:focus-visible, .form-control:focus, .btn-close:focus-visible {
+      outline: 3px solid #0d6efd; outline-offset: 2px; box-shadow: none;
+    }
+    #textInput { resize: vertical; min-height: 9rem; }
+    .result-label { font-size: clamp(1.6rem, 5vw, 2.25rem); font-weight: 700; overflow-wrap: anywhere; }
+    .meta-item { overflow-wrap: anywhere; }
+    .status-dot { font-size: 0.7rem; }
+    .progress { height: 0.85rem; }
+    .progress-bar { transition: width 0.4s ease; }
+    @media (prefers-reduced-motion: reduce) { .progress-bar { transition: none; } }
+  </style>
+</head>
+<body>
+  <main class="app-shell container py-4 py-md-5">
+
+    <!-- Header and model status -->
+    <header class="row g-3 align-items-start mb-4">
+      <div class="col-12 col-md">
+        <h1 class="app-title h2 mb-2">Food Not-Food Classifier</h1>
+        <p class="app-muted mb-0">Classify text, review the prediction, and help improve the model through feedback.</p>
+      </div>
+      <div class="col-12 col-md-auto">
+        <section class="card shadow-sm" aria-labelledby="statusHeading">
+          <div class="card-body py-3 px-4">
+            <h2 id="statusHeading" class="h6 app-muted mb-1">Model status</h2>
+            <div class="fw-semibold">Active model: <span id="modelVersion">Loading...</span></div>
+            <div id="modelStatus" role="status" aria-live="polite">
+              <span class="badge text-bg-secondary"><i class="bi bi-circle-fill status-dot me-1" aria-hidden="true"></i>Checking</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <!-- Input -->
+    <section class="card shadow-sm mb-4" aria-labelledby="inputHeading">
+      <div class="card-body p-4">
+        <h2 id="inputHeading" class="visually-hidden">Classification input</h2>
+        <label for="textInput" class="form-label fw-semibold">Text to classify</label>
+        <textarea id="textInput" class="form-control form-control-lg" rows="5"
+                  placeholder="Enter a sentence, description, or food-related text..."
+                  aria-describedby="charCounter validationMessage"></textarea>
+        <div class="d-flex justify-content-between align-items-start mt-2 gap-3">
+          <div id="validationMessage" class="small text-danger" role="alert"></div>
+          <div id="charCounter" class="small app-muted text-nowrap">0 / 2000</div>
+        </div>
+        <div class="d-grid d-sm-flex mt-3">
+          <button id="classifyBtn" type="button" class="btn btn-accent btn-lg px-4">
+            <span id="classifyIdle"><i class="bi bi-magic me-2" aria-hidden="true"></i>Classify text</span>
+            <span id="classifyBusy" class="d-none">
+              <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Classifying...
+            </span>
+          </button>
+        </div>
+        <div id="errorBox" class="alert alert-danger d-none mt-3 mb-0" role="alert">
+          <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i><span id="errorText"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Prediction result -->
+    <section id="resultSection" class="card shadow-sm mb-4 d-none" aria-labelledby="resultHeading" aria-live="polite">
+      <div class="card-body p-4">
+        <h2 id="resultHeading" class="h6 app-muted mb-2">Predicted label</h2>
+        <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+          <span id="resultLabel" class="result-label"></span>
+          <span id="resultBadge" class="badge fs-6"><i id="resultIcon" class="me-1" aria-hidden="true"></i><span id="resultBadgeText"></span></span>
+        </div>
+
+        <div class="d-flex justify-content-between mb-1">
+          <span id="confidenceLabel" class="fw-semibold">Confidence</span>
+          <span id="confidenceText" class="fw-semibold"></span>
+        </div>
+        <div class="progress mb-3">
+          <div id="confidenceBar" class="progress-bar" role="progressbar"
+               aria-labelledby="confidenceLabel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="width: 0%"></div>
+        </div>
+
+        <div class="row g-2 small app-muted">
+          <div class="col-12 col-sm-6 meta-item"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Model: <span id="resultModel" class="fw-semibold text-body"></span></div>
+          <div class="col-12 col-sm-6 meta-item"><i class="bi bi-hash me-1" aria-hidden="true"></i>Prediction ID: <span id="resultId" class="fw-semibold text-body"></span></div>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Feedback -->
+        <div id="feedbackSection">
+          <h3 class="h6 mb-3">Was this prediction correct?</h3>
+          <div class="d-grid d-sm-flex gap-2">
+            <button id="likeBtn" type="button" class="btn btn-outline-success">
+              <i class="bi bi-hand-thumbs-up me-2" aria-hidden="true"></i>Yes, correct
+            </button>
+            <button id="dislikeBtn" type="button" class="btn btn-outline-danger">
+              <i class="bi bi-hand-thumbs-down me-2" aria-hidden="true"></i>No, wrong
+            </button>
+          </div>
+          <div id="feedbackBusy" class="small app-muted mt-2 d-none" role="status">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Saving feedback...
+          </div>
+          <div id="feedbackError" class="alert alert-danger d-none mt-3 mb-0" role="alert"></div>
+        </div>
+
+        <div id="feedbackResult" class="d-none" role="status" aria-live="polite">
+          <div id="feedbackConfirm" class="alert alert-success mb-3">
+            <i class="bi bi-check-circle me-2" aria-hidden="true"></i><span id="feedbackConfirmText"></span>
+          </div>
+          <div id="retrainNotice" class="alert mb-3 d-none">
+            <i id="retrainIcon" class="me-2" aria-hidden="true"></i><span id="retrainText"></span>
+          </div>
+          <button id="resetBtn" type="button" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Classify another text
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var MAX_CHARS = 2000;
+      var POLL_MS = 5000;
+
+      var state = {
+        currentPrediction: null,
+        currentPredictionId: null,
+        feedbackSubmitted: false,
+        isRequestInProgress: false,
+        isFeedbackInProgress: false,
+        lastModelVersion: null
+      };
+
+      var $ = function (id) { return document.getElementById(id); };
+      var el = {
+        input: $("textInput"), counter: $("charCounter"), validation: $("validationMessage"),
+        classifyBtn: $("classifyBtn"), classifyIdle: $("classifyIdle"), classifyBusy: $("classifyBusy"),
+        errorBox: $("errorBox"), errorText: $("errorText"),
+        resultSection: $("resultSection"), resultLabel: $("resultLabel"), resultBadge: $("resultBadge"),
+        resultIcon: $("resultIcon"), resultBadgeText: $("resultBadgeText"),
+        confidenceText: $("confidenceText"), confidenceBar: $("confidenceBar"),
+        resultModel: $("resultModel"), resultId: $("resultId"),
+        feedbackSection: $("feedbackSection"), likeBtn: $("likeBtn"), dislikeBtn: $("dislikeBtn"),
+        feedbackBusy: $("feedbackBusy"), feedbackError: $("feedbackError"),
+        feedbackResult: $("feedbackResult"), feedbackConfirmText: $("feedbackConfirmText"),
+        retrainNotice: $("retrainNotice"), retrainIcon: $("retrainIcon"), retrainText: $("retrainText"),
+        resetBtn: $("resetBtn"),
+        modelVersion: $("modelVersion"), modelStatus: $("modelStatus")
+      };
+
+      var GENERIC_ERROR = "Something went wrong while processing your request. Please try again.";
+      var NETWORK_ERROR = "Could not connect to the application server.";
+
+      /* ---------- Errors ---------- */
+
+      function ApiError(message) {
+        this.name = "ApiError";
+        this.message = message;
+      }
+      ApiError.prototype = Object.create(Error.prototype);
+
+      function formatValidationDetail(detail) {
+        if (!Array.isArray(detail) || detail.length === 0) { return "Please check your input and try again."; }
+        var first = detail[0] || {};
+        var type = String(first.type || "");
+        if (type.indexOf("too_long") !== -1) { return "Please keep the text under " + MAX_CHARS + " characters."; }
+        if (type.indexOf("too_short") !== -1 || type.indexOf("missing") !== -1) { return "Please enter some text to classify."; }
+        return "Please check your input and try again.";
+      }
+
+      function errorFromResponse(status, body) {
+        if (status >= 500) { return GENERIC_ERROR; }
+        if (status === 422) { return formatValidationDetail(body && body.detail); }
+        if (body && typeof body.detail === "string" && body.detail.length < 200) { return body.detail; }
+        return "The request could not be completed. Please try again.";
+      }
+
+      function showError(message) {
+        el.errorText.textContent = message;
+        el.errorBox.classList.remove("d-none");
+      }
+
+      function clearError() {
+        el.errorBox.classList.add("d-none");
+        el.errorText.textContent = "";
+      }
+
+      /* ---------- API ---------- */
+
+      async function apiRequest(path, options) {
+        var response;
+        try {
+          response = await fetch(path, options);
+        } catch (err) {
+          throw new ApiError(NETWORK_ERROR);
+        }
+        var body = null;
+        try { body = await response.json(); } catch (err) { body = null; }
+        if (!response.ok) { throw new ApiError(errorFromResponse(response.status, body)); }
+        if (body === null || typeof body !== "object") { throw new ApiError(GENERIC_ERROR); }
+        return body;
+      }
+
+      function postJson(path, payload) {
+        return apiRequest(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      /* ---------- Input validation ---------- */
+
+      function validateInput() {
+        var length = el.input.value.length;
+        el.counter.textContent = length + " / " + MAX_CHARS;
+        el.counter.classList.toggle("text-danger", length > MAX_CHARS);
+        if (length > MAX_CHARS) {
+          el.validation.textContent = "Please keep the text under " + MAX_CHARS + " characters.";
+          return false;
+        }
+        el.validation.textContent = "";
+        return true;
+      }
+
+      function isInputSubmittable() {
+        var text = el.input.value.trim();
+        if (text.length === 0) {
+          el.validation.textContent = "Please enter some text to classify.";
+          return false;
+        }
+        return validateInput();
+      }
+
+      /* ---------- Loading state ---------- */
+
+      function setLoadingState(isLoading) {
+        state.isRequestInProgress = isLoading;
+        el.classifyBtn.disabled = isLoading;
+        el.classifyBtn.setAttribute("aria-busy", String(isLoading));
+        el.classifyIdle.classList.toggle("d-none", isLoading);
+        el.classifyBusy.classList.toggle("d-none", !isLoading);
+      }
+
+      function setFeedbackLoading(isLoading) {
+        state.isFeedbackInProgress = isLoading;
+        el.likeBtn.disabled = isLoading;
+        el.dislikeBtn.disabled = isLoading;
+        el.feedbackBusy.classList.toggle("d-none", !isLoading);
+      }
+
+      /* ---------- Prediction ---------- */
+
+      function parsePrediction(data) {
+        var score = Number(data.score);
+        var id = Number(data.prediction_id);
+        if (typeof data.label !== "string" || !isFinite(score) || !isFinite(id)) {
+          throw new ApiError(GENERIC_ERROR);
+        }
+        return {
+          id: id,
+          label: data.label,
+          score: Math.min(1, Math.max(0, score)),
+          modelVersion: data.model_version ? String(data.model_version) : "unknown"
+        };
+      }
+
+      function hideResult() {
+        el.resultSection.classList.add("d-none");
+        el.feedbackResult.classList.add("d-none");
+        el.feedbackSection.classList.remove("d-none");
+        el.retrainNotice.classList.add("d-none");
+        el.feedbackError.classList.add("d-none");
+        el.feedbackBusy.classList.add("d-none");
+        el.likeBtn.disabled = false;
+        el.dislikeBtn.disabled = false;
+      }
+
+      function updatePredictionUI(prediction) {
+        var isFood = prediction.label === "food";
+        var percent = Math.round(prediction.score * 1000) / 10;
+
+        el.resultLabel.textContent = prediction.label;
+        el.resultBadge.className = "badge fs-6 " + (isFood ? "text-bg-success" : "text-bg-warning");
+        el.resultIcon.className = "me-1 bi " + (isFood ? "bi-egg-fried" : "bi-slash-circle");
+        el.resultBadgeText.textContent = isFood ? "Food" : "Not food";
+
+        el.confidenceText.textContent = percent.toFixed(1) + "%";
+        el.confidenceBar.style.width = percent + "%";
+        el.confidenceBar.setAttribute("aria-valuenow", String(Math.round(percent)));
+        el.confidenceBar.classList.toggle("bg-success", isFood);
+        el.confidenceBar.classList.toggle("bg-warning", !isFood);
+
+        el.resultModel.textContent = prediction.modelVersion;
+        el.resultId.textContent = "#" + prediction.id;
+
+        hideResult();
+        el.resultSection.classList.remove("d-none");
+      }
+
+      async function predictText() {
+        if (state.isRequestInProgress) { return; }
+        clearError();
+        if (!isInputSubmittable()) { return; }
+
+        state.currentPrediction = null;
+        state.currentPredictionId = null;
+        state.feedbackSubmitted = false;
+        hideResult();
+        setLoadingState(true);
+
+        try {
+          var data = await postJson("/predict", { text: el.input.value.trim() });
+          var prediction = parsePrediction(data);
+          state.currentPrediction = prediction;
+          state.currentPredictionId = prediction.id;
+          updatePredictionUI(prediction);
+        } catch (err) {
+          showError(err instanceof ApiError ? err.message : GENERIC_ERROR);
+        } finally {
+          setLoadingState(false);
+        }
+      }
+
+      /* ---------- Feedback ---------- */
+
+      function showFeedbackResult(data, feedback) {
+        var message = "Feedback saved.";
+        if (typeof data.corrected_label === "string" && data.corrected_label) {
+          message += " The corrected label is: " + data.corrected_label + ".";
+        }
+        el.feedbackConfirmText.textContent = message;
+
+        var notice = el.retrainNotice;
+        notice.classList.add("d-none");
+        if (data.retraining_started === true) {
+          notice.className = "alert alert-info mb-3";
+          el.retrainIcon.className = "me-2 bi bi-arrow-repeat";
+          el.retrainText.textContent = "Retraining started based on accumulated feedback. The current model remains active while the new model is being evaluated.";
+        } else if (data.retraining_triggered === true) {
+          notice.className = "alert alert-warning mb-3";
+          el.retrainIcon.className = "me-2 bi bi-exclamation-circle";
+          el.retrainText.textContent = "Retraining was triggered but could not start. Please check the server status.";
+        }
+
+        el.feedbackSection.classList.add("d-none");
+        el.feedbackResult.classList.remove("d-none");
+      }
+
+      async function sendFeedback(feedback) {
+        if (state.isFeedbackInProgress || state.feedbackSubmitted || state.currentPredictionId === null) { return; }
+        var predictionId = state.currentPredictionId;
+        el.feedbackError.classList.add("d-none");
+        setFeedbackLoading(true);
+
+        try {
+          var data = await postJson("/feedback", { prediction_id: predictionId, feedback: feedback });
+          if (predictionId !== state.currentPredictionId) { return; }
+          state.feedbackSubmitted = true;
+          showFeedbackResult(data, feedback);
+          updateModelStatus();
+        } catch (err) {
+          el.feedbackError.textContent = err instanceof ApiError ? err.message : GENERIC_ERROR;
+          el.feedbackError.classList.remove("d-none");
+          setFeedbackLoading(false);
+          return;
+        }
+        setFeedbackLoading(false);
+        el.likeBtn.disabled = true;
+        el.dislikeBtn.disabled = true;
+      }
+
+      /* ---------- Reset ---------- */
+
+      function resetPrediction() {
+        state.currentPrediction = null;
+        state.currentPredictionId = null;
+        state.feedbackSubmitted = false;
+        hideResult();
+        clearError();
+        el.input.value = "";
+        validateInput();
+        el.validation.textContent = "";
+        el.input.focus();
+      }
+
+      /* ---------- Model status ---------- */
+
+      function renderStatusBadge(inProgress) {
+        el.modelStatus.textContent = "";
+        var badge = document.createElement("span");
+        badge.className = "badge " + (inProgress ? "text-bg-warning" : "text-bg-success");
+        var dot = document.createElement("i");
+        dot.className = "bi bi-circle-fill status-dot me-1";
+        dot.setAttribute("aria-hidden", "true");
+        badge.appendChild(dot);
+        badge.appendChild(document.createTextNode(inProgress ? "Retraining in progress" : "Ready"));
+        el.modelStatus.appendChild(badge);
+      }
+
+      async function updateModelStatus() {
+        try {
+          var data = await apiRequest("/health/status", { headers: { "Accept": "application/json" } });
+          var version = data.model_version ? String(data.model_version) : "unknown";
+          el.modelVersion.textContent = version;
+          renderStatusBadge(data.retraining_in_progress === true);
+          state.lastModelVersion = version;
+        } catch (err) {
+          el.modelVersion.textContent = state.lastModelVersion || "Unavailable";
+          el.modelStatus.textContent = "";
+          var badge = document.createElement("span");
+          badge.className = "badge text-bg-secondary";
+          badge.textContent = "Status unavailable";
+          el.modelStatus.appendChild(badge);
+        }
+      }
+
+      /* ---------- Init ---------- */
+
+      function init() {
+        el.input.addEventListener("input", function () {
+          validateInput();
+          if (el.validation.textContent === "" ) { clearError(); }
+        });
+        el.input.addEventListener("keydown", function (event) {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { predictText(); }
+        });
+        el.classifyBtn.addEventListener("click", predictText);
+        el.likeBtn.addEventListener("click", function () { sendFeedback("like"); });
+        el.dislikeBtn.addEventListener("click", function () { sendFeedback("dislike"); });
+        el.resetBtn.addEventListener("click", resetPrediction);
+
+        el.input.value = "";
+        validateInput();
+        updateModelStatus();
+        setInterval(function () {
+          if (!document.hidden) { updateModelStatus(); }
+        }, POLL_MS);
+      }
+
+      init();
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
